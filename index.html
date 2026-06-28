@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Game - Lesson 1</title>
+  </head>
+  <body>
+    <!--
+      We use a <canvas> element instead of a <div>.
+      Three.js draws all 3D graphics onto a <canvas>.
+      Think of it as the TV screen where our 3D world is displayed.
+    -->
+    <canvas id="game-canvas"></canvas>
+
+    <!--
+      type="module" tells the browser this is an ES module.
+      This lets us use 'import' and 'export' statements.
+      Vite requires this to work properly.
+    -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

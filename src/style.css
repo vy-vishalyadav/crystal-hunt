@@ -1,0 +1,35 @@
+/*
+ * ============================================
+ * GLOBAL STYLES FOR OUR 3D GAME
+ * ============================================
+ *
+ * Why these styles matter:
+ * By default, browsers add margins/padding and show scrollbars.
+ * For a fullscreen 3D game, we need the canvas to fill the
+ * entire viewport with NO extra space or scrollbars.
+ */
+
+/* Reset all default margins and padding on every element */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;  /* Makes width/height include padding + border */
+}
+
+/* Make the HTML and body fill the full viewport */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;  /* Hide scrollbars — we don't need them in a game */
+}
+
+/*
+ * The game canvas should fill the entire screen.
+ * 'display: block' removes a tiny gap that inline elements have.
+ */
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
