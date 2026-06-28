@@ -1,35 +1,270 @@
-/*
- * ============================================
- * GLOBAL STYLES FOR OUR 3D GAME
- * ============================================
- *
- * Why these styles matter:
- * By default, browsers add margins/padding and show scrollbars.
- * For a fullscreen 3D game, we need the canvas to fill the
- * entire viewport with NO extra space or scrollbars.
- */
+/* ===== RESET ===== */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
 
-/* Reset all default margins and padding on every element */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;  /* Makes width/height include padding + border */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Outfit', sans-serif; }
+#game-canvas { display: block; width: 100%; height: 100%; }
+
+/* ===== HUD ===== */
+#hud {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 10;
 }
 
-/* Make the HTML and body fill the full viewport */
-html,
-body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;  /* Hide scrollbars — we don't need them in a game */
+.hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 30px;
 }
 
-/*
- * The game canvas should fill the entire screen.
- * 'display: block' removes a tiny gap that inline elements have.
- */
-#game-canvas {
-  display: block;
-  width: 100%;
+/* Health bar */
+.health-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.health-label {
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.health-bar-bg {
+  width: 200px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.health-bar-fill {
   height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #2ecc71, #27ae60);
+  border-radius: 7px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.health-text {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* Score */
+.score-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.score-icon { font-size: 22px; }
+
+.score-text {
+  color: #FFD700;
+  font-weight: 800;
+  font-size: 22px;
+  min-width: 40px;
+}
+
+/* Controls hint */
+.hud-bottom {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.controls-hint {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  padding: 10px 24px;
+  border-radius: 10px;
+  transition: opacity 0.5s ease;
+  letter-spacing: 0.5px;
+}
+
+/* Crosshair */
+.crosshair {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  font-weight: 100;
+  pointer-events: none;
+  z-index: 11;
+}
+
+/* Damage flash overlay */
+.damage-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(231, 76, 60, 0.6) 100%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* ===== MENU SCREENS ===== */
+#menu-screen, #gameover-screen, #win-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+}
+
+.menu-content {
+  text-align: center;
+  color: white;
+  animation: fadeSlideUp 0.6s ease;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.game-title {
+  font-size: 72px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
+}
+
+.title-highlight {
+  color: #FFD700;
+}
+
+.game-subtitle {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 30px;
+  font-weight: 400;
+}
+
+.menu-divider {
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #FFD700, transparent);
+  margin: 0 auto 30px;
+}
+
+.menu-btn {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #1a1a2e;
+  border: none;
+  padding: 16px 48px;
+  font-size: 18px;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: 2px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
+}
+
+.menu-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.5);
+}
+
+.menu-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.menu-controls {
+  margin-top: 40px;
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+}
+
+.control-item {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-item kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Game over */
+.gameover-title {
+  font-size: 64px;
+  font-weight: 800;
+  color: #E74C3C;
+  text-shadow: 0 0 40px rgba(231, 76, 60, 0.5);
+  margin-bottom: 16px;
+}
+
+.gameover-score {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 30px;
+}
+
+.gameover-score span {
+  color: #FFD700;
+  font-weight: 800;
+}
+
+.restart-btn {
+  background: linear-gradient(135deg, #E74C3C, #C0392B) !important;
+  color: white !important;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.3) !important;
+}
+
+.restart-btn:hover {
+  box-shadow: 0 8px 30px rgba(231, 76, 60, 0.5) !important;
+}
+
+/* Win screen */
+.win-title {
+  font-size: 64px;
+  font-weight: 800;
+  color: #FFD700;
+  text-shadow: 0 0 40px rgba(255, 215, 0, 0.5);
+  margin-bottom: 8px;
+}
+
+.win-text {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
 }

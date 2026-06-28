@@ -1,100 +1,123 @@
-/*
- * ============================================
- * MAIN.JS — The Entry Point of Our Game
- * ============================================
- *
- * This file does two things:
- *   1. Initializes the 3D scene by calling our setup function
- *   2. Runs the ANIMATION LOOP that keeps the game alive
- *
- * The animation loop is the HEARTBEAT of every game.
- * It runs ~60 times per second (60 FPS), and each iteration:
- *   - Updates object positions/rotations (game logic)
- *   - Renders the scene (draws the frame)
- */
+// Main entry point — wires everything together and runs the game loop
 
-// Import our CSS styles (Vite processes this automatically)
 import './style.css';
-
-// Import our scene setup function
+import * as THREE from 'three';
 import { createScene } from './scene/SceneSetup.js';
+import { InputManager } from './systems/InputManager.js';
+import { Player } from './player/Player.js';
+import { ThirdPersonCamera } from './camera/ThirdPersonCamera.js';
+import { Environment } from './environment/Environment.js';
+import { CollectibleManager } from './entities/Collectible.js';
+import { EnemyManager } from './entities/Enemy.js';
+import { ParticleSystem } from './systems/ParticleSystem.js';
+import { GameState } from './systems/GameState.js';
+import { HUD } from './ui/HUD.js';
+import { MenuScreen, GameOverScreen, WinScreen } from './ui/MenuScreen.js';
 
-// =========================================
-// 1. INITIALIZE THE SCENE
-// =========================================
-
-/*
- * Grab the <canvas> element from index.html.
- * This is the "screen" where Three.js will paint our 3D world.
- */
+// ===== Core setup =====
 const canvas = document.getElementById('game-canvas');
+const { scene, camera, renderer } = createScene(canvas);
+const inputManager = new InputManager();
+const particleSystem = new ParticleSystem(scene);
+const gameState = new GameState();
 
-/*
- * Call our setup function to create the entire 3D world.
- * We destructure the returned object to get individual references
- * to the scene, camera, renderer, and cube.
- *
- * Destructuring: const { a, b } = { a: 1, b: 2 }
- * is a shorthand for: const a = obj.a; const b = obj.b;
- */
-const { scene, camera, renderer, cube } = createScene(canvas);
+// ===== Game objects (initialized on game start) =====
+let player, thirdPersonCamera, environment, collectibles, enemies;
 
+// ===== HUD =====
+const hud = new HUD();
+hud.hide();
 
-// =========================================
-// 2. THE ANIMATION LOOP (the game's heartbeat)
-// =========================================
+// ===== Initialize a new game =====
+function initGame() {
+  player = new Player(scene);
+  thirdPersonCamera = new ThirdPersonCamera(camera, player.group);
+  environment = new Environment(scene);
+  collectibles = new CollectibleManager(scene, 15);
+  enemies = new EnemyManager(scene, 8);
 
-/*
- * requestAnimationFrame is a browser API that calls our function
- * right before the next screen repaint (usually 60 times/second).
- *
- * Why not use setInterval?
- *   - requestAnimationFrame automatically pauses when the tab
- *     is hidden (saves CPU/battery)
- *   - It syncs with the monitor's refresh rate (smooth animation)
- *   - setInterval can cause stuttering because it's not synced
- *
- * The pattern works like this:
- *   1. animate() runs
- *   2. At the end, it asks the browser: "Call me again next frame"
- *   3. The browser calls animate() again ~16ms later
- *   4. Repeat forever = smooth animation!
- */
+  inputManager.requestPointerLock(canvas);
+
+  hud.show();
+  hud.updateHealth(100);
+  hud.updateScore(0);
+  gameState.score = 0;
+}
+
+// ===== Screens =====
+const menuScreen = new MenuScreen(() => {
+  menuScreen.hide();
+  gameState.setState('playing');
+  initGame();
+});
+
+const gameOverScreen = new GameOverScreen(() => window.location.reload());
+const winScreen = new WinScreen(() => window.location.reload());
+
+// ===== Game loop =====
+let lastTime = performance.now();
+
 function animate() {
-  // Schedule the next frame FIRST (so animation continues even if there's an error below)
   requestAnimationFrame(animate);
 
-  // -----------------------------------------
-  // UPDATE PHASE: Move/rotate objects
-  // -----------------------------------------
+  const now = performance.now();
+  const deltaTime = Math.min((now - lastTime) / 1000, 0.1); // capped delta
+  lastTime = now;
 
-  /*
-   * Rotate the cube a tiny amount each frame.
-   *
-   * cube.rotation.x and .y are measured in RADIANS (not degrees).
-   *   - Full circle = 2π radians = 360°
-   *   - 0.01 radians ≈ 0.57° per frame
-   *   - At 60 FPS: 0.01 × 60 = 0.6 radians/sec ≈ 34°/sec
-   *
-   * We rotate on both X and Y axes to get a nice tumbling effect.
-   */
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
+  if (gameState.isPlaying && player) {
+    // Input → Camera
+    thirdPersonCamera.handleMouseMove(inputManager);
 
-  // -----------------------------------------
-  // RENDER PHASE: Draw the frame
-  // -----------------------------------------
+    // Update all systems
+    player.update(deltaTime, inputManager, thirdPersonCamera.getYaw());
+    thirdPersonCamera.update(deltaTime);
+    collectibles.update(deltaTime);
+    enemies.update(deltaTime, player.position);
+    particleSystem.update(deltaTime);
 
-  /*
-   * renderer.render() takes a snapshot of the scene
-   * from the camera's perspective and draws it on the canvas.
-   * This is called EVERY frame to update what the player sees.
-   */
+    // Crystal collection
+    const collected = collectibles.checkCollection(player.position);
+    if (collected > 0) {
+      gameState.addScore(collected * 100);
+      hud.updateScore(gameState.score);
+      particleSystem.emit(
+        new THREE.Vector3(player.position.x, player.position.y + 1.5, player.position.z),
+        0xFFD700, 20
+      );
+
+      // Win check
+      if (collectibles.collectedCount >= collectibles.totalCount) {
+        gameState.setState('win');
+        hud.hide();
+        winScreen.show(gameState.score);
+      }
+    }
+
+    // Enemy damage
+    const damage = enemies.checkAttacks(player.position);
+    if (damage > 0) {
+      player.takeDamage(damage);
+      hud.updateHealth(player.health);
+      hud.flashDamage();
+      particleSystem.emit(
+        new THREE.Vector3(player.position.x, player.position.y + 1, player.position.z),
+        0xE74C3C, 10
+      );
+
+      // Death check
+      if (!player.isAlive) {
+        gameState.setState('gameover');
+        hud.hide();
+        gameOverScreen.show(gameState.score);
+      }
+    }
+
+    // Hide hint once player locks mouse
+    if (inputManager.isPointerLocked) hud.hideControlsHint();
+  }
+
   renderer.render(scene, camera);
 }
 
-// Start the animation loop! 🚀
 animate();
-
-// Log to console so we know everything loaded correctly
-console.log('🎮 3D Game initialized successfully!');
+console.log('🎮 Crystal Hunt loaded!');
