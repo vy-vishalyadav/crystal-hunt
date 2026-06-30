@@ -20,7 +20,7 @@ export class HUD {
       </div>
       <div class="hud-bottom">
         <div class="controls-hint" id="controls-hint">
-          WASD to move · Mouse to look · Shift to sprint · Click to start
+          WASD to move · Mouse to look · Left Click to shoot · Shift to sprint
         </div>
       </div>
       <div class="crosshair" id="crosshair">+</div>

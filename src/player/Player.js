@@ -138,6 +138,11 @@ export class Player {
     barrel.position.set(0, 0.03, -0.65);
     this.rifle.add(barrel);
 
+    // Muzzle Point Helper (at the tip of the barrel)
+    this.muzzlePoint = new THREE.Object3D();
+    this.muzzlePoint.position.set(0, 0.03, -0.9);
+    this.rifle.add(this.muzzlePoint);
+
     // Magazine
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.12), rifleMat);
     mag.position.set(0, -0.15, -0.25);
@@ -233,5 +238,15 @@ export class Player {
     // Keep player within ground bounds
     this.group.position.x = clamp(this.group.position.x, -48, 48);
     this.group.position.z = clamp(this.group.position.z, -48, 48);
+  }
+
+  getMuzzlePosition() {
+    const pos = new THREE.Vector3();
+    if (this.muzzlePoint) {
+      this.muzzlePoint.getWorldPosition(pos);
+    } else {
+      pos.copy(this.group.position).y += 1.35; // fallback
+    }
+    return pos;
   }
 }

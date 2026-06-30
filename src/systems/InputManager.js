@@ -2,13 +2,15 @@
 
 export class InputManager {
   constructor() {
-    this.keys = { forward: false, backward: false, left: false, right: false, sprint: false };
+    this.keys = { forward: false, backward: false, left: false, right: false, sprint: false, shoot: false };
     this.mouse = { movementX: 0, movementY: 0 };
     this.isPointerLocked = false;
 
     window.addEventListener('keydown', (e) => this._updateKey(e.code, true));
     window.addEventListener('keyup', (e) => this._updateKey(e.code, false));
     window.addEventListener('mousemove', (e) => this._onMouseMove(e));
+    window.addEventListener('mousedown', (e) => this._onMouseButton(e, true));
+    window.addEventListener('mouseup', (e) => this._onMouseButton(e, false));
     document.addEventListener('pointerlockchange', () => {
       this.isPointerLocked = document.pointerLockElement !== null;
     });
@@ -39,6 +41,12 @@ export class InputManager {
     if (this.isPointerLocked) {
       this.mouse.movementX += e.movementX;
       this.mouse.movementY += e.movementY;
+    }
+  }
+
+  _onMouseButton(e, pressed) {
+    if (e.button === 0 && this.isPointerLocked) { // Left click
+      this.keys.shoot = pressed;
     }
   }
 }

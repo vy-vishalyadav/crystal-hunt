@@ -6,11 +6,12 @@ import { randomRange, distance } from '../utils/MathUtils.js';
 class Enemy {
   constructor(scene, position) {
     this.isAlive = true;
-    this.speed = 3.5; // Slightly faster for challenge
+    this.speed = 3.5; // Walk speed
     this.attackRange = 2;
     this.attackCooldown = 0;
     this.attackRate = 1.0;
     this.damage = 10;
+    this.health = 30; // 3 rifle hits to kill
 
     // Create container group
     this.group = new THREE.Group();
@@ -163,6 +164,35 @@ class Enemy {
     this.walkTime = randomRange(0, Math.PI * 2);
   }
 
+  takeDamage(amount, scene) {
+    if (!this.isAlive) return false;
+    this.health -= amount;
+
+    // Flash armor white momentarily on hit
+    this.group.traverse(child => {
+      if (child.isMesh && child.material && child.material.color) {
+        const originalColor = child.material.color.getHex();
+        // Skip skin & glow light
+        if (originalColor !== 0x8b5a2b && originalColor !== 0xff0000) {
+          child.material.emissive.setHex(0xffffff);
+          child.material.emissiveIntensity = 0.8;
+          setTimeout(() => {
+            if (this.isAlive) {
+              child.material.emissive.setHex(originalColor === 0x8b0000 ? 0x500000 : 0x000000);
+              child.material.emissiveIntensity = originalColor === 0x8b0000 ? 0.2 : 0.0;
+            }
+          }, 80);
+        }
+      }
+    });
+
+    if (this.health <= 0) {
+      this.destroy(scene);
+      return true; // Indicates death
+    }
+    return false;
+  }
+
   update(deltaTime, playerPosition) {
     if (!this.isAlive) return;
 
@@ -223,12 +253,15 @@ export class EnemyManager {
     this.enemies = [];
 
     for (let i = 0; i < count; i++) {
-      // Spawn in a ring far from center
-      const angle = (i / count) * Math.PI * 2;
-      const dist = randomRange(25, 45);
-      const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
-      this.enemies.push(new Enemy(scene, pos));
+      this.spawnEnemy(i, count);
     }
+  }
+
+  spawnEnemy(index = 0, count = 8) {
+    const angle = (index / count) * Math.PI * 2 + randomRange(-0.2, 0.2);
+    const dist = randomRange(28, 45);
+    const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+    this.enemies.push(new Enemy(this.scene, pos));
   }
 
   update(deltaTime, playerPosition) {
@@ -243,5 +276,45 @@ export class EnemyManager {
       }
     }
     return totalDamage;
+  }
+
+  // Method to check if our gun ray hit an enemy, and deal damage
+  checkRaycastHit(raycaster, damage = 10) {
+    // Gather all enemy groups for raycast targeting
+    const targetGroups = this.enemies.map(e => e.group);
+    if (targetGroups.length === 0) return null;
+
+    // Raycast check (recursive = true to check child meshes)
+    const intersects = raycaster.intersectObjects(targetGroups, true);
+
+    if (intersects.length > 0) {
+      const hitObject = intersects[0].object;
+      const hitPoint = intersects[0].point;
+
+      // Traverse up to find which Enemy instance owns this mesh
+      for (const enemy of this.enemies) {
+        let isOwner = false;
+        enemy.group.traverse(child => {
+          if (child === hitObject) isOwner = true;
+        });
+
+        if (isOwner) {
+          const isDead = enemy.takeDamage(damage, this.scene);
+          
+          if (isDead) {
+            // Remove from active list
+            this.enemies = this.enemies.filter(e => e !== enemy);
+            // Spawn a replacement commando elsewhere
+            this.spawnEnemy(Math.floor(randomRange(0, 8)), 8);
+            
+            return { hit: true, killed: true, enemyPos: enemy.group.position.clone(), hitPoint };
+          }
+          
+          return { hit: true, killed: false, enemyPos: enemy.group.position.clone(), hitPoint };
+        }
+      }
+    }
+
+    return null;
   }
 }
