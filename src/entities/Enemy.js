@@ -1,4 +1,4 @@
-// Red enemy orbs — Red Rogue Commando soldiers that chase the player and deal damage
+// Red enemy orbs — Zombie Commandos that chase the player slowly and deal damage
 
 import * as THREE from 'three';
 import { randomRange, distance } from '../utils/MathUtils.js';
@@ -6,84 +6,80 @@ import { randomRange, distance } from '../utils/MathUtils.js';
 class Enemy {
   constructor(scene, position) {
     this.isAlive = true;
-    this.speed = 3.5; // Walk speed
-    this.attackRange = 2;
+    this.speed = 1.8; // Slowed down from 3.5 for classic zombie speed
+    this.attackRange = 1.8;
     this.attackCooldown = 0;
-    this.attackRate = 1.0;
+    this.attackRate = 1.2;
     this.damage = 10;
     this.health = 30; // 3 rifle hits to kill
 
     // Create container group
     this.group = new THREE.Group();
 
-    // Materials
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.7 }); // Darker, weathered skin
-    const shirtMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }); // Black combat shirt
-    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x3a2c2c, roughness: 0.9 }); // Dark red/brown camo pants
-    const armorMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.6, metalness: 0.2 }); // Crimson red tactical vest
-    const bootMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 }); // Black heavy combat boots
-    const helmetMat = new THREE.MeshStandardMaterial({ color: 0x5a1818, roughness: 0.6, metalness: 0.4 }); // Dark red combat helmet
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Glowing red eyes
-    const weaponMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.8 }); // Steel weapon mat
-    const bladeMat = new THREE.MeshStandardMaterial({ color: 0x8a0303, emissive: 0x500000, roughness: 0.3, metalness: 0.9 }); // Crimson machete blade
+    // Zombie Materials (decaying colors)
+    const zombieSkinMat = new THREE.MeshStandardMaterial({ color: 0x5a7d5a, roughness: 0.8 }); // Pale decaying green
+    const rippedShirtMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 }); // Torn muddy brown shirt
+    const rippedPantsMat = new THREE.MeshStandardMaterial({ color: 0x311b92, roughness: 0.9 }); // Ripped dark purple pants
+    const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 }); // Dirty boots
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Glowing hollow white eyes
 
-    // --- TORSO & RED VEST ---
+    // --- TORSO (Ripped muddy shirt) ---
     const torsoGroup = new THREE.Group();
     torsoGroup.position.y = 1.35;
 
-    const torsoGeo = new THREE.BoxGeometry(0.7, 0.9, 0.4);
-    const torsoMesh = new THREE.Mesh(torsoGeo, shirtMat);
+    const torsoGeo = new THREE.BoxGeometry(0.68, 0.85, 0.38);
+    const torsoMesh = new THREE.Mesh(torsoGeo, rippedShirtMat);
     torsoMesh.castShadow = true;
     torsoMesh.receiveShadow = true;
     torsoGroup.add(torsoMesh);
 
-    // Tactical Red Armor Vest
-    const vestGeo = new THREE.BoxGeometry(0.76, 0.7, 0.46);
-    const vestMesh = new THREE.Mesh(vestGeo, armorMat);
-    vestMesh.castShadow = true;
-    torsoGroup.add(vestMesh);
+    // Exposed green shoulder/neck joints (adds details to a ripped shirt look)
+    const neckGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.2);
+    const neck = new THREE.Mesh(neckGeo, zombieSkinMat);
+    neck.position.y = 0.45;
+    torsoGroup.add(neck);
 
     this.group.add(torsoGroup);
 
-    // --- HEAD & RED HELMET ---
+    // --- ZOMBIE HEAD (Decaying Green) ---
     const headGroup = new THREE.Group();
     headGroup.position.set(0, 2.0, 0);
 
     const headGeo = new THREE.SphereGeometry(0.26, 16, 16);
-    const headMesh = new THREE.Mesh(headGeo, skinMat);
+    const headMesh = new THREE.Mesh(headGeo, zombieSkinMat);
     headMesh.castShadow = true;
     headGroup.add(headMesh);
 
-    // Dark Red Helmet
-    const helmetGeo = new THREE.SphereGeometry(0.29, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.65);
-    const helmetMesh = new THREE.Mesh(helmetGeo, helmetMat);
-    helmetMesh.position.y = 0.03;
-    helmetMesh.castShadow = true;
-    headGroup.add(helmetMesh);
-
-    // Glowing Red Eyes
-    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
+    // Glowing Hollow White Eyes
+    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMat);
     leftEye.position.set(-0.1, 0.05, -0.23);
-    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
+    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMat);
     rightEye.position.set(0.1, 0.05, -0.23);
     headGroup.add(leftEye);
     headGroup.add(rightEye);
 
+    // Rotten jaw / mouth (represented by a simple dark box)
+    const mouthMat = new THREE.MeshStandardMaterial({ color: 0x211111, roughness: 0.9 });
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.1), mouthMat);
+    mouth.position.set(0, -0.12, -0.21);
+    headGroup.add(mouth);
+
     this.group.add(headGroup);
 
-    // --- LEGS (for walking animations) ---
+    // --- LEGS (Ripped purple pants + hobbling walk) ---
     // Left Leg Group
     this.leftLeg = new THREE.Group();
-    this.leftLeg.position.set(-0.22, 0.9, 0);
+    this.leftLeg.position.set(-0.2, 0.9, 0);
 
-    const legGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.9, 8);
-    const leftLegMesh = new THREE.Mesh(legGeo, pantsMat);
+    const legGeo = new THREE.CylinderGeometry(0.11, 0.09, 0.9, 8);
+    const leftLegMesh = new THREE.Mesh(legGeo, rippedPantsMat);
     leftLegMesh.position.y = -0.45;
     leftLegMesh.castShadow = true;
     leftLegMesh.receiveShadow = true;
     this.leftLeg.add(leftLegMesh);
 
-    const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.15, 0.3), bootMat);
+    // Boot
+    const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.28), bootMat);
     leftBoot.position.set(0, -0.9, -0.06);
     leftBoot.castShadow = true;
     this.leftLeg.add(leftBoot);
@@ -92,71 +88,53 @@ class Enemy {
 
     // Right Leg Group
     this.rightLeg = new THREE.Group();
-    this.rightLeg.position.set(0.22, 0.9, 0);
+    this.rightLeg.position.set(0.2, 0.9, 0);
 
-    const rightLegMesh = new THREE.Mesh(legGeo, pantsMat);
+    const rightLegMesh = new THREE.Mesh(legGeo, rippedPantsMat);
     rightLegMesh.position.y = -0.45;
     rightLegMesh.castShadow = true;
     rightLegMesh.receiveShadow = true;
     this.rightLeg.add(rightLegMesh);
 
-    const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.15, 0.3), bootMat);
+    // Boot
+    const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.28), bootMat);
     rightBoot.position.set(0, -0.9, -0.06);
     rightBoot.castShadow = true;
     this.rightLeg.add(rightBoot);
 
     this.group.add(this.rightLeg);
 
-    // --- ARMS & WEAPON (Crimson Machete) ---
-    // Right Arm (holds weapon)
-    this.rightArm = new THREE.Group();
-    this.rightArm.position.set(0.42, 1.6, 0);
-    const armGeo = new THREE.CylinderGeometry(0.1, 0.08, 0.8, 8);
-    const rightArmMesh = new THREE.Mesh(armGeo, shirtMat);
-    rightArmMesh.position.y = -0.4;
-    rightArmMesh.castShadow = true;
-    this.rightArm.add(rightArmMesh);
-    this.group.add(this.rightArm);
+    // --- ARMS (Extended straight forward to grab player) ---
+    const armGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.85, 8);
 
-    // Left Arm (hanging ready to attack)
+    // Left Arm
     this.leftArm = new THREE.Group();
     this.leftArm.position.set(-0.42, 1.6, 0);
-    const leftArmMesh = new THREE.Mesh(armGeo, shirtMat);
+    const leftArmMesh = new THREE.Mesh(armGeo, zombieSkinMat); // zombie skin showing
     leftArmMesh.position.y = -0.4;
     leftArmMesh.castShadow = true;
     this.leftArm.add(leftArmMesh);
+    // Rotate arm straight forward (pointing along Z axis)
+    this.leftArm.rotation.x = -Math.PI / 2;
     this.group.add(this.leftArm);
 
-    // Crimson Tactical Machete / Blade
-    this.machete = new THREE.Group();
-    
-    // Hilt / Handle
-    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3), weaponMat);
-    hilt.position.y = 0.15;
-    this.machete.add(hilt);
+    // Right Arm
+    this.rightArm = new THREE.Group();
+    this.rightArm.position.set(0.42, 1.6, 0);
+    const rightArmMesh = new THREE.Mesh(armGeo, zombieSkinMat);
+    rightArmMesh.position.y = -0.4;
+    rightArmMesh.castShadow = true;
+    this.rightArm.add(rightArmMesh);
+    // Rotate arm straight forward (pointing along Z axis)
+    this.rightArm.rotation.x = -Math.PI / 2;
+    this.group.add(this.rightArm);
 
-    // Guard
-    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.06), weaponMat);
-    guard.position.y = 0.3;
-    this.machete.add(guard);
-
-    // Blade (Crimson steel)
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.9, 0.15), bladeMat);
-    blade.position.set(0, 0.75, 0.03);
-    blade.castShadow = true;
-    this.machete.add(blade);
-
-    // Position machete in right hand
-    this.machete.position.set(0.42, 0.9, -0.3);
-    this.machete.rotation.set(Math.PI / 3, 0, 0); // Ready to strike
-    this.group.add(this.machete);
-
-    // Glow light (Red warning aura)
-    this.light = new THREE.PointLight(0xe74c3c, 0.4, 4);
+    // Glow light (Subtle green warning aura)
+    this.light = new THREE.PointLight(0x5a7d5a, 0.3, 4);
     this.light.position.set(0, 1.5, 0);
     this.group.add(this.light);
 
-    // Spawn at requested position
+    // Spawn position
     this.group.position.copy(position);
     scene.add(this.group);
 
@@ -168,18 +146,18 @@ class Enemy {
     if (!this.isAlive) return false;
     this.health -= amount;
 
-    // Flash armor white momentarily on hit
+    // Flash body emissive red on damage
     this.group.traverse(child => {
-      if (child.isMesh && child.material && child.material.color) {
-        const originalColor = child.material.color.getHex();
-        // Skip skin & glow light
-        if (originalColor !== 0x8b5a2b && originalColor !== 0xff0000) {
-          child.material.emissive.setHex(0xffffff);
-          child.material.emissiveIntensity = 0.8;
+      if (child.isMesh && child.material) {
+        const mat = child.material;
+        if (mat.emissive) {
+          const originalEmissive = mat.emissive.getHex();
+          mat.emissive.setHex(0xe74c3c);
+          mat.emissiveIntensity = 0.8;
           setTimeout(() => {
             if (this.isAlive) {
-              child.material.emissive.setHex(originalColor === 0x8b0000 ? 0x500000 : 0x000000);
-              child.material.emissiveIntensity = originalColor === 0x8b0000 ? 0.2 : 0.0;
+              mat.emissive.setHex(originalEmissive);
+              mat.emissiveIntensity = 0.0;
             }
           }, 80);
         }
@@ -199,7 +177,7 @@ class Enemy {
     // Chase logic
     const dist = distance(this.group.position, playerPosition);
     
-    // Look at player direction (rotate around Y axis)
+    // Face player
     const angleToPlayer = Math.atan2(playerPosition.x - this.group.position.x, playerPosition.z - this.group.position.z);
     this.group.rotation.y = angleToPlayer;
 
@@ -210,19 +188,24 @@ class Enemy {
       this.group.position.x += dir.x * this.speed * deltaTime;
       this.group.position.z += dir.z * this.speed * deltaTime;
 
-      // Walking animation
-      this.walkTime += deltaTime * 12;
-      this.leftLeg.rotation.x = Math.sin(this.walkTime) * 0.5;
-      this.rightLeg.rotation.x = -Math.sin(this.walkTime) * 0.5;
+      // Zombie walking animation (slow staggered leg swing, minor shoulder sway)
+      this.walkTime += deltaTime * 5; // slower swing speed
       
-      // Swing arms & bob weapon
-      this.leftArm.rotation.x = -Math.sin(this.walkTime) * 0.3;
-      this.rightArm.rotation.x = Math.sin(this.walkTime) * 0.3;
-      this.machete.rotation.x = Math.PI / 3 + Math.sin(this.walkTime) * 0.1;
+      // Assymmetric leg swing to look like a limp/shuffle
+      this.leftLeg.rotation.x = Math.sin(this.walkTime) * 0.35;
+      this.rightLeg.rotation.x = -Math.sin(this.walkTime + 0.5) * 0.3; 
+      
+      // Arms bob up/down slightly as they reach forward
+      this.leftArm.rotation.x = -Math.PI / 2 + Math.sin(this.walkTime * 2) * 0.08;
+      this.rightArm.rotation.x = -Math.PI / 2 - Math.sin(this.walkTime * 2) * 0.08;
+      
+      // Zombie hunched upper body posture bobbing
+      this.group.position.y = Math.sin(this.walkTime * 2) * 0.03;
     } else {
-      // Attack state (rapidly slash with weapon)
-      this.walkTime += deltaTime * 20;
-      this.machete.rotation.x = Math.PI / 6 + Math.cos(this.walkTime) * 0.8; // Slashing motion
+      // Zombie attacking state (scratching and lunging)
+      this.walkTime += deltaTime * 12;
+      this.leftArm.rotation.x = -Math.PI / 3 + Math.sin(this.walkTime) * 0.5;
+      this.rightArm.rotation.x = -Math.PI / 3 - Math.sin(this.walkTime) * 0.5;
       
       this.leftLeg.rotation.x = THREE.MathUtils.lerp(this.leftLeg.rotation.x, 0, deltaTime * 10);
       this.rightLeg.rotation.x = THREE.MathUtils.lerp(this.rightLeg.rotation.x, 0, deltaTime * 10);
@@ -280,18 +263,15 @@ export class EnemyManager {
 
   // Method to check if our gun ray hit an enemy, and deal damage
   checkRaycastHit(raycaster, damage = 10) {
-    // Gather all enemy groups for raycast targeting
     const targetGroups = this.enemies.map(e => e.group);
     if (targetGroups.length === 0) return null;
 
-    // Raycast check (recursive = true to check child meshes)
     const intersects = raycaster.intersectObjects(targetGroups, true);
 
     if (intersects.length > 0) {
       const hitObject = intersects[0].object;
       const hitPoint = intersects[0].point;
 
-      // Traverse up to find which Enemy instance owns this mesh
       for (const enemy of this.enemies) {
         let isOwner = false;
         enemy.group.traverse(child => {
@@ -302,9 +282,7 @@ export class EnemyManager {
           const isDead = enemy.takeDamage(damage, this.scene);
           
           if (isDead) {
-            // Remove from active list
             this.enemies = this.enemies.filter(e => e !== enemy);
-            // Spawn a replacement commando elsewhere
             this.spawnEnemy(Math.floor(randomRange(0, 8)), 8);
             
             return { hit: true, killed: true, enemyPos: enemy.group.position.clone(), hitPoint };
