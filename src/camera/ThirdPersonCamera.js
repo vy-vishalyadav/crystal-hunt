@@ -1,4 +1,4 @@
-// Third-person camera that orbits around the player
+// Third-person camera that orbits around the player with terrain clipping prevention
 
 import * as THREE from 'three';
 import { clamp } from '../utils/MathUtils.js';
@@ -17,7 +17,8 @@ export class ThirdPersonCamera {
   handleMouseMove(inputManager) {
     this.yaw -= inputManager.mouse.movementX * this.sensitivity;
     this.pitch -= inputManager.mouse.movementY * this.sensitivity;
-    this.pitch = clamp(this.pitch, -0.5, 1.2);
+    // Optimized: Clamped pitch minimum to 0.0 to prevent camera from looking up from below ground level.
+    this.pitch = clamp(this.pitch, 0.0, 1.2);
     inputManager.resetMouseDelta();
   }
 
@@ -34,6 +35,11 @@ export class ThirdPersonCamera {
       targetPos.y + offsetY,
       targetPos.z + offsetZ
     );
+
+    // Optimized: Ground Guard to prevent camera from ever dipping below the terrain (minimum Y height of 1.5)
+    if (desired.y < 1.5) {
+      desired.y = 1.5;
+    }
 
     // Smooth follow (frame-rate independent)
     const t = 1 - Math.pow(0.001, deltaTime);
