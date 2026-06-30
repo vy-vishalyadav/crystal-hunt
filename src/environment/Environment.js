@@ -12,8 +12,9 @@ export class Environment {
   }
 
   _createGround(scene) {
-    // Optimized: Changed segments from 50x50 to 1x1. This drops polygon count from 5,000 triangles to 2 triangles.
-    const geo = new THREE.PlaneGeometry(100, 100, 1, 1);
+    // Optimized: Changed segments to 20x20. This provides enough vertices for correct fog calculation near the center, 
+    // while keeping polygon count extremely low (only 800 triangles) for your integrated GPU.
+    const geo = new THREE.PlaneGeometry(100, 100, 20, 20);
     const mat = new THREE.MeshStandardMaterial({ color: 0x4CAF50, roughness: 0.8, metalness: 0.1 });
     const ground = new THREE.Mesh(geo, mat);
     ground.rotation.x = -Math.PI / 2;
