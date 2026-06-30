@@ -129,21 +129,13 @@ function animate() {
           particleSystem.emit(hitResult.hitPoint, 0xffa500, 6);
         }
       } else {
-        // Raycast environment & ground to make bullet tracers stop on objects
-        const intersects = raycaster.intersectObjects(scene.children, true);
-        for (const intersect of intersects) {
-          // Check if object belongs to the player or muzzle flash
-          let isPlayerPart = false;
-          player.group.traverse(child => {
-            if (child === intersect.object) isPlayerPart = true;
-          });
-          
-          if (!isPlayerPart && intersect.object.name !== "sky") {
-            endPoint.copy(intersect.point);
-            // Gray dust impact sparks
-            particleSystem.emit(intersect.point, 0xbfbfbf, 4);
-            break;
-          }
+        // Raycast environment & ground to make bullet tracers stop on objects (optimized to query only static collidable meshes)
+        const intersects = raycaster.intersectObjects(environment.collidableMeshes, true);
+        if (intersects.length > 0) {
+          const hit = intersects[0];
+          endPoint.copy(hit.point);
+          // Gray dust impact sparks
+          particleSystem.emit(hit.point, 0xbfbfbf, 4);
         }
       }
 

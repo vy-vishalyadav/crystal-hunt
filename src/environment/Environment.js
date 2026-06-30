@@ -1,24 +1,31 @@
-// Procedural environment — ground, trees, rocks
+// Procedural environment — ground, trees, rocks optimized for low-end GPUs
 
 import * as THREE from 'three';
 import { randomRange } from '../utils/MathUtils.js';
 
 export class Environment {
   constructor(scene) {
+    this.collidableMeshes = []; // List of static meshes to raycast against
     this._createGround(scene);
     this._createTrees(scene);
     this._createRocks(scene);
   }
 
   _createGround(scene) {
-    const geo = new THREE.PlaneGeometry(100, 100, 50, 50);
+    // Optimized: Changed segments from 50x50 to 1x1. This drops polygon count from 5,000 triangles to 2 triangles.
+    const geo = new THREE.PlaneGeometry(100, 100, 1, 1);
     const mat = new THREE.MeshStandardMaterial({ color: 0x4CAF50, roughness: 0.8, metalness: 0.1 });
     const ground = new THREE.Mesh(geo, mat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
+    
+    // Explicit name for identification
+    ground.name = 'ground';
+    
     scene.add(ground);
+    this.collidableMeshes.push(ground);
 
-    // Subtle grid overlay
+    // Subtle grid overlay (GridHelper is already highly optimized in WebGL)
     const grid = new THREE.GridHelper(100, 50, 0x3d8b40, 0x3d8b40);
     grid.position.y = 0.01;
     grid.material.opacity = 0.15;
@@ -40,12 +47,16 @@ export class Environment {
       const trunk = new THREE.Mesh(trunkGeo, trunkMat);
       trunk.position.set(x, 1.5, z);
       trunk.castShadow = true;
+      trunk.name = 'tree_trunk';
       scene.add(trunk);
+      this.collidableMeshes.push(trunk);
 
       const leaves = new THREE.Mesh(leafGeo, leafMat);
       leaves.position.set(x, 5, z);
       leaves.castShadow = true;
+      leaves.name = 'tree_leaves';
       scene.add(leaves);
+      this.collidableMeshes.push(leaves);
     }
   }
 
@@ -58,13 +69,16 @@ export class Environment {
       while (Math.abs(x) < 6 && Math.abs(z) < 6);
 
       const scale = randomRange(0.5, 2);
-      const geo = new THREE.DodecahedronGeometry(scale, 1);
+      // Dodecahedron is low-poly and lightweight
+      const geo = new THREE.DodecahedronGeometry(scale, 0); // detail=0 for absolute minimum triangles
       const rock = new THREE.Mesh(geo, mat);
       rock.position.set(x, scale * 0.4, z);
       rock.rotation.set(randomRange(0, Math.PI), randomRange(0, Math.PI), 0);
       rock.castShadow = true;
       rock.receiveShadow = true;
+      rock.name = 'rock';
       scene.add(rock);
+      this.collidableMeshes.push(rock);
     }
   }
 }
