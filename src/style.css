@@ -346,3 +346,24 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Outfit',
   color: rgba(255, 255, 255, 0.7);
   margin-bottom: 10px;
 }
+
+/* ===== MINIMAP RADAR ===== */
+.minimap-container {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 10;
+}
+
+#minimap {
+  display: block;
+  border-radius: 8px;
+  background: rgba(0, 20, 5, 0.25); /* translucent military dark green */
+}

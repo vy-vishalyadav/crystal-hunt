@@ -109,6 +109,9 @@ function animate() {
     enemies.update(deltaTime, player.position);
     particleSystem.update(deltaTime);
 
+    // Update the HUD Minimap radar (Zombies as red dots, Crystals as gold dots, Player as green arrow)
+    hud.updateMinimap(player.position, player.cameraYaw, enemies.enemies, collectibles.crystals);
+
     // -----------------------------------------
     // RELOADING LOGIC
     // -----------------------------------------
