@@ -12,6 +12,9 @@ export class Player {
     if (!camera.parent) {
       scene.add(camera);
     }
+    
+    // Set rotation order to YXZ (Yaw, then Pitch) to prevent Euler gimbal/Z-axis roll locks (tilting)
+    this.camera.rotation.order = 'YXZ';
 
     this.group = new THREE.Group();
     this.group.position.set(0, 0, 0);
@@ -128,10 +131,8 @@ export class Player {
     
     inputManager.resetMouseDelta();
 
-    // Rotate camera directly (rotation order: Y first then X)
-    this.camera.rotation.set(0, 0, 0);
-    this.camera.rotation.y = this.cameraYaw;
-    this.camera.rotation.x = this.cameraPitch;
+    // Rotate camera directly (YXZ order locks Z roll to exactly 0 to prevent tilting sideways)
+    this.camera.rotation.set(this.cameraPitch, this.cameraYaw, 0, 'YXZ');
 
     // -----------------------------------------
     // 2. MOVEMENT & JUMP PHYSICS
