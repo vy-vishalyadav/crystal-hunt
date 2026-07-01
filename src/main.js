@@ -1,11 +1,10 @@
-// Main entry point — wires everything together and runs the game loop with shooting mechanics, ammo/reloads, waves, and SFX
+// Main entry point — wires everything together and runs the FPS game loop with shooting mechanics, ammo/reloads, waves, and SFX
 
 import './style.css';
 import * as THREE from 'three';
 import { createScene } from './scene/SceneSetup.js';
 import { InputManager } from './systems/InputManager.js';
 import { Player } from './player/Player.js';
-import { ThirdPersonCamera } from './camera/ThirdPersonCamera.js';
 import { Environment } from './environment/Environment.js';
 import { CollectibleManager } from './entities/Collectible.js';
 import { EnemyManager } from './entities/Enemy.js';
@@ -24,7 +23,7 @@ const gameState = new GameState();
 const audioManager = new AudioManager();
 
 // ===== Game objects (initialized on game start) =====
-let player, thirdPersonCamera, environment, collectibles, enemies;
+let player, environment, collectibles, enemies;
 
 // ===== Shooting & Visual Effects State =====
 let tracers = [];
@@ -49,8 +48,7 @@ hud.hide();
 
 // ===== Initialize a new game =====
 function initGame() {
-  player = new Player(scene);
-  thirdPersonCamera = new ThirdPersonCamera(camera, player.group);
+  player = new Player(scene, camera);
   environment = new Environment(scene);
   collectibles = new CollectibleManager(scene, 15);
   enemies = new EnemyManager(scene, 8);
@@ -114,12 +112,8 @@ function animate() {
   lastTime = now;
 
   if (gameState.isPlaying && player) {
-    // Input → Camera Rotation
-    thirdPersonCamera.handleMouseMove(inputManager);
-
-    // Update player and camera positions
-    player.update(deltaTime, inputManager, thirdPersonCamera.getYaw());
-    thirdPersonCamera.update(deltaTime);
+    // Update player position, physics (gravity, jumps), ADS, FOV, and mouse look
+    player.update(deltaTime, inputManager);
     
     // Update active game entities
     collectibles.update(deltaTime);
@@ -161,7 +155,6 @@ function animate() {
     // Attempt to shoot
     if (inputManager.keys.shoot && shootCooldown <= 0 && player.isAlive) {
       if (isReloading) {
-        // Can't shoot while reloading
         shootCooldown = 0.1;
       } else if (ammoLoaded <= 0) {
         // Out of ammo! Trigger auto-reload
@@ -171,7 +164,6 @@ function animate() {
           hud.setReloading(true);
           audioManager.playReload();
         } else {
-          // completely dry
           shootCooldown = 0.2;
         }
       } else {
@@ -180,7 +172,7 @@ function animate() {
         hud.updateAmmo(ammoLoaded, ammoReserve);
 
         shootCooldown = 0.12; // 120ms between shots (~500 RPM)
-        shakeIntensity = 0.08; // Apply camera recoil shake
+        shakeIntensity = 0.04; // Apply small screen recoil shake
 
         // Play gunshot SFX
         audioManager.playShoot();
@@ -223,7 +215,7 @@ function animate() {
         }
 
         // 1. Create Muzzle Flash (quick bright yellow sphere)
-        const flashGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        const flashGeo = new THREE.SphereGeometry(0.06, 8, 8);
         const flashMat = new THREE.MeshBasicMaterial({ color: 0xffe600 });
         const flashMesh = new THREE.Mesh(flashGeo, flashMat);
         flashMesh.position.copy(muzzlePos);
@@ -280,13 +272,12 @@ function animate() {
     // -----------------------------------------
     const collected = collectibles.checkCollection(player.position);
     if (collected > 0) {
-      // Play collection ring SFX
       audioManager.playCollect();
 
       gameState.addScore(collected * 100);
       hud.updateScore(gameState.score);
       particleSystem.emit(
-        new THREE.Vector3(player.position.x, player.position.y + 1.5, player.position.z),
+        new THREE.Vector3(player.position.x, player.position.y + 1.0, player.position.z),
         0xFFD700, 20
       );
 
@@ -296,7 +287,6 @@ function animate() {
         currentWave++;
         hud.showWaveBanner("WAVE " + currentWave);
         
-        // Play zombie roar and speed them up
         audioManager.playZombieGrowl();
         zombieBaseSpeed += 0.35; // Speed up zombies
         
@@ -304,7 +294,7 @@ function animate() {
           e.speed = zombieBaseSpeed;
         });
 
-        // Spawn 2 extra zombies for increased difficulty
+        // Spawn 2 extra zombies
         enemies.spawnEnemy(currentWave, 8);
         enemies.spawnEnemy(currentWave + 1, 8);
       }
@@ -323,18 +313,18 @@ function animate() {
     // -----------------------------------------
     const damage = enemies.checkAttacks(player.position);
     if (damage > 0) {
-      // Play damage groan SFX
       audioManager.playDamage();
 
       player.takeDamage(damage);
       hud.updateHealth(player.health);
       hud.flashDamage();
+      
+      // Spawn blood splat particles around head height
       particleSystem.emit(
-        new THREE.Vector3(player.position.x, player.position.y + 1, player.position.z),
+        new THREE.Vector3(player.position.x, player.position.y + 1.2, player.position.z),
         0xE74C3C, 10
       );
 
-      // Play random zombie growl sound occasionally when attacking
       if (Math.random() < 0.3) {
         audioManager.playZombieGrowl();
       }
@@ -355,4 +345,4 @@ function animate() {
 }
 
 animate();
-console.log('🎮 Crystal Hunt Phase 2 Loaded Successfully!');
+console.log('🎮 Crystal Hunt FPS Mode Loaded!');

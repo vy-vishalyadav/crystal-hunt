@@ -1,183 +1,101 @@
-// Player character — Procedural PUBG-like Soldier with walking animations and an M416 rifle
+// Player character — First-Person Shooter (FPS) controller with jump physics, ADS, and gun bobbing
 
 import * as THREE from 'three';
 import { clamp } from '../utils/MathUtils.js';
 
 export class Player {
-  constructor(scene) {
+  constructor(scene, camera) {
+    this.scene = scene;
+    this.camera = camera;
+    
+    // Ensure camera is added to the scene so its child meshes (first-person gun) render
+    if (!camera.parent) {
+      scene.add(camera);
+    }
+
     this.group = new THREE.Group();
-
-    // Materials
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.6 }); // Peach skin
-    const shirtMat = new THREE.MeshStandardMaterial({ color: 0xe6c280, roughness: 0.8 }); // Khaki/desert shirt
-    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x3d4b3a, roughness: 0.9 }); // Olive camo green
-    const armorMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.7, metalness: 0.2 }); // Dark tactical vest
-    const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 }); // Black combat boots
-    const helmetMat = new THREE.MeshStandardMaterial({ color: 0x4a5340, roughness: 0.5, metalness: 0.5 }); // Level 3 green helmet
-    const visorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.9 }); // Dark visor
-    const backpackMat = new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.8 }); // Olive backpack
-    const rifleMat = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.7, metalness: 0.6 }); // Black metallic rifle
-
-    // --- TORSO & ARMOR VEST ---
-    const torsoGroup = new THREE.Group();
-    torsoGroup.position.y = 1.35; // Center of torso
-
-    const torsoGeo = new THREE.BoxGeometry(0.7, 0.9, 0.4);
-    const torsoMesh = new THREE.Mesh(torsoGeo, shirtMat);
-    torsoMesh.castShadow = true;
-    torsoMesh.receiveShadow = true;
-    torsoGroup.add(torsoMesh);
-
-    // Tactical Vest (Thicker box over torso)
-    const vestGeo = new THREE.BoxGeometry(0.76, 0.7, 0.46);
-    const vestMesh = new THREE.Mesh(vestGeo, armorMat);
-    vestMesh.castShadow = true;
-    torsoGroup.add(vestMesh);
-
-    // Military Backpack (Box on back)
-    const backpackGeo = new THREE.BoxGeometry(0.55, 0.7, 0.3);
-    const backpackMesh = new THREE.Mesh(backpackGeo, backpackMat);
-    backpackMesh.position.set(0, 0, 0.33);
-    backpackMesh.castShadow = true;
-    torsoGroup.add(backpackMesh);
-
-    this.group.add(torsoGroup);
-
-    // --- HEAD & HELMET ---
-    const headGroup = new THREE.Group();
-    headGroup.position.set(0, 2.0, 0);
-
-    // Head sphere
-    const headGeo = new THREE.SphereGeometry(0.26, 16, 16);
-    const headMesh = new THREE.Mesh(headGeo, skinMat);
-    headMesh.castShadow = true;
-    headGroup.add(headMesh);
-
-    // Level 3 Helmet
-    const helmetGeo = new THREE.SphereGeometry(0.29, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    const helmetMesh = new THREE.Mesh(helmetGeo, helmetMat);
-    helmetMesh.position.y = 0.03;
-    helmetMesh.castShadow = true;
-    headGroup.add(helmetMesh);
-
-    // Helmet Visor
-    const visorGeo = new THREE.BoxGeometry(0.3, 0.12, 0.1);
-    const visorMesh = new THREE.Mesh(visorGeo, visorMat);
-    visorMesh.position.set(0, 0.02, -0.25);
-    headGroup.add(visorMesh);
-
-    this.group.add(headGroup);
-
-    // --- LEGS (for walking animation) ---
-    // Left Leg Group (rotates around hip joint)
-    this.leftLeg = new THREE.Group();
-    this.leftLeg.position.set(-0.22, 0.9, 0);
-
-    const legGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.9, 8);
-    const leftLegMesh = new THREE.Mesh(legGeo, pantsMat);
-    leftLegMesh.position.y = -0.45; // Shift cylinder down so top aligns with joint
-    leftLegMesh.castShadow = true;
-    leftLegMesh.receiveShadow = true;
-    this.leftLeg.add(leftLegMesh);
-
-    const bootGeo = new THREE.BoxGeometry(0.16, 0.15, 0.3);
-    const leftBoot = new THREE.Mesh(bootGeo, bootMat);
-    leftBoot.position.set(0, -0.9, -0.06);
-    leftBoot.castShadow = true;
-    this.leftLeg.add(leftBoot);
-
-    this.group.add(this.leftLeg);
-
-    // Right Leg Group
-    this.rightLeg = new THREE.Group();
-    this.rightLeg.position.set(0.22, 0.9, 0);
-
-    const rightLegMesh = new THREE.Mesh(legGeo, pantsMat);
-    rightLegMesh.position.y = -0.45;
-    rightLegMesh.castShadow = true;
-    rightLegMesh.receiveShadow = true;
-    this.rightLeg.add(rightLegMesh);
-
-    const rightBoot = new THREE.Mesh(bootGeo, bootMat);
-    rightBoot.position.set(0, -0.9, -0.06);
-    rightBoot.castShadow = true;
-    this.rightLeg.add(rightBoot);
-
-    this.group.add(this.rightLeg);
-
-    // --- ARMS & WEAPON (M416 Rifle) ---
-    // Right Arm (holds rifle)
-    this.rightArm = new THREE.Group();
-    this.rightArm.position.set(0.42, 1.6, 0);
-    const armGeo = new THREE.CylinderGeometry(0.1, 0.08, 0.8, 8);
-    const rightArmMesh = new THREE.Mesh(armGeo, shirtMat);
-    rightArmMesh.position.y = -0.4;
-    rightArmMesh.castShadow = true;
-    this.rightArm.add(rightArmMesh);
-    this.group.add(this.rightArm);
-
-    // Left Arm (supports rifle)
-    this.leftArm = new THREE.Group();
-    this.leftArm.position.set(-0.42, 1.6, 0);
-    const leftArmMesh = new THREE.Mesh(armGeo, shirtMat);
-    leftArmMesh.position.y = -0.4;
-    leftArmMesh.castShadow = true;
-    this.leftArm.add(leftArmMesh);
-    this.group.add(this.leftArm);
-
-    // M416 Rifle Assembly
-    this.rifle = new THREE.Group();
-
-    // Receiver/Body
-    const bodyRifle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.8), rifleMat);
-    this.rifle.add(bodyRifle);
-
-    // Barrel
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5), rifleMat);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.03, -0.65);
-    this.rifle.add(barrel);
-
-    // Muzzle Point Helper (at the tip of the barrel)
-    this.muzzlePoint = new THREE.Object3D();
-    this.muzzlePoint.position.set(0, 0.03, -0.9);
-    this.rifle.add(this.muzzlePoint);
-
-    // Magazine
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.12), rifleMat);
-    mag.position.set(0, -0.15, -0.25);
-    mag.rotation.x = -0.2;
-    this.rifle.add(mag);
-
-    // Stock
-    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.3), rifleMat);
-    stock.position.set(0, -0.02, 0.5);
-    this.rifle.add(stock);
-
-    // Scope (Red Dot)
-    const scope = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.2), rifleMat);
-    scope.position.set(0, 0.11, -0.15);
-    this.rifle.add(scope);
-
-    // Position Rifle in front of character (held in hands)
-    this.rifle.position.set(0.2, 1.35, -0.45);
-    this.rifle.rotation.set(-0.15, -0.2, 0); // Angled ready position
-    this.group.add(this.rifle);
-
-    // Position whole group
     this.group.position.set(0, 0, 0);
     scene.add(this.group);
 
-    // Stats
+    // --- PHYSICS & MOVEMENT STATS ---
     this.health = 100;
     this.maxHealth = 100;
     this.isAlive = true;
-    this.speed = 8;
+    
+    this.speed = 6.5;
     this.sprintMultiplier = 1.6;
     this.direction = new THREE.Vector3();
+    
+    this.velocity = new THREE.Vector3();
+    this.isGrounded = true;
+    this.gravity = 22.0; // gravity force
+    this.jumpForce = 8.0; // jump height speed
 
-    // Animation tracking
-    this.walkTime = 0;
+    // --- CAMERA LOOK CONTROLS ---
+    this.cameraYaw = 0;
+    this.cameraPitch = 0;
+    this.sensitivity = 0.002;
+
+    // --- FIRST-PERSON WEAPON (M416 Rifle attached to camera) ---
+    this.gunGroup = new THREE.Group();
+    
+    // Rifle materials
+    const rifleMat = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.7, metalness: 0.6 });
+    
+    // Receiver/Body
+    const bodyRifle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.35), rifleMat);
+    this.gunGroup.add(bodyRifle);
+
+    // Barrel
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.25), rifleMat);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.012, -0.3);
+    this.gunGroup.add(barrel);
+
+    // Muzzle Point Helper (for tracers and muzzle flash)
+    this.muzzlePoint = new THREE.Object3D();
+    this.muzzlePoint.position.set(0, 0.012, -0.43);
+    this.gunGroup.add(this.muzzlePoint);
+
+    // Magazine
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.05), rifleMat);
+    mag.position.set(0, -0.06, -0.1);
+    mag.rotation.x = -0.2;
+    this.gunGroup.add(mag);
+
+    // Stock
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.12), rifleMat);
+    stock.position.set(0, -0.01, 0.22);
+    this.gunGroup.add(stock);
+
+    // Scope (Red Dot sight)
+    const scope = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.03, 0.08), rifleMat);
+    scope.position.set(0, 0.045, -0.06);
+    this.gunGroup.add(scope);
+    
+    // Holographic ring placeholder
+    const reticleMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const reticle = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.015, 0.005), reticleMat);
+    reticle.position.set(0, 0.05, -0.09);
+    this.gunGroup.add(reticle);
+
+    // Attach gun to the camera
+    this.camera.add(this.gunGroup);
+
+    // Gun Positioning offsets (Hipfire default)
+    this.hipfirePosition = new THREE.Vector3(0.16, -0.18, -0.32);
+    this.hipfireRotation = new THREE.Euler(-0.05, -0.05, 0);
+
+    // Aim Down Sights (ADS) offsets
+    this.adsPosition = new THREE.Vector3(0.0, -0.045, -0.22);
+    this.adsRotation = new THREE.Euler(0.0, 0.0, 0);
+
+    this.gunGroup.position.copy(this.hipfirePosition);
+    this.gunGroup.rotation.copy(this.hipfireRotation);
+
+    // Bobbing & FOV scaling states
+    this.bobTime = 0;
+    this.currentFov = 75;
   }
 
   get position() { return this.group.position; }
@@ -185,55 +103,128 @@ export class Player {
   takeDamage(amount) {
     if (!this.isAlive) return;
     this.health = clamp(this.health - amount, 0, this.maxHealth);
-    if (this.health <= 0) this.isAlive = false;
+    if (this.health <= 0) {
+      this.isAlive = false;
+      // Detach gun on death
+      this.camera.remove(this.gunGroup);
+    }
   }
 
   heal(amount) {
     this.health = clamp(this.health + amount, 0, this.maxHealth);
   }
 
-  update(deltaTime, inputManager, cameraYaw) {
+  update(deltaTime, inputManager) {
     if (!this.isAlive) return;
 
+    // -----------------------------------------
+    // 1. MOUSE LOOK (Camera rotation)
+    // -----------------------------------------
+    this.cameraYaw -= inputManager.mouse.movementX * this.sensitivity;
+    this.cameraPitch -= inputManager.mouse.movementY * this.sensitivity;
+    
+    // Clamp pitch to prevent flipping upside down (approx 85 degrees up/down)
+    this.cameraPitch = clamp(this.cameraPitch, -Math.PI / 2.1, Math.PI / 2.1);
+    
+    inputManager.resetMouseDelta();
+
+    // Rotate camera directly (rotation order: Y first then X)
+    this.camera.rotation.set(0, 0, 0);
+    this.camera.rotation.y = this.cameraYaw;
+    this.camera.rotation.x = this.cameraPitch;
+
+    // -----------------------------------------
+    // 2. MOVEMENT & JUMP PHYSICS
+    // -----------------------------------------
     this.direction.set(0, 0, 0);
     if (inputManager.keys.forward)  this.direction.z -= 1;
     if (inputManager.keys.backward) this.direction.z += 1;
     if (inputManager.keys.left)     this.direction.x -= 1;
     if (inputManager.keys.right)    this.direction.x += 1;
 
-    const isMoving = this.direction.length() > 0;
+    // Calculate move speed and sprint multiplier
+    const isSprinting = inputManager.keys.sprint && inputManager.keys.forward && !inputManager.keys.ads;
+    const currentSpeed = isSprinting ? this.speed * this.sprintMultiplier : this.speed;
 
-    if (isMoving) {
+    // Translate keyboard inputs into camera-relative movement (projected on ground plane)
+    const moveVector = new THREE.Vector3();
+    if (this.direction.length() > 0) {
       this.direction.normalize();
-      // Rotate movement direction by camera yaw so WASD is camera-relative
-      const moveAngle = Math.atan2(this.direction.x, this.direction.z) + cameraYaw;
-      const currentSpeed = inputManager.keys.sprint ? this.speed * this.sprintMultiplier : this.speed;
-
-      this.group.position.x += Math.sin(moveAngle) * currentSpeed * deltaTime;
-      this.group.position.z += Math.cos(moveAngle) * currentSpeed * deltaTime;
-      this.group.rotation.y = moveAngle; // Face movement direction
-
-      // Animate walking (swing legs/arms)
-      const animSpeed = inputManager.keys.sprint ? 16 : 10;
-      this.walkTime += deltaTime * animSpeed;
-
-      this.leftLeg.rotation.x = Math.sin(this.walkTime) * 0.6;
-      this.rightLeg.rotation.x = -Math.sin(this.walkTime) * 0.6;
-
-      // Arms swing opposite of legs, but keeping them holding the rifle generally forward
-      this.leftArm.rotation.x = -Math.sin(this.walkTime) * 0.2 - 0.2;
-      this.rightArm.rotation.x = Math.sin(this.walkTime) * 0.2 - 0.2;
-
-      // Slightly bob the M416 up and down
-      this.rifle.position.y = 1.35 + Math.sin(this.walkTime * 2) * 0.05;
-    } else {
-      // Idle pose - return legs/arms smoothly to straight positions
-      this.leftLeg.rotation.x = THREE.MathUtils.lerp(this.leftLeg.rotation.x, 0, deltaTime * 10);
-      this.rightLeg.rotation.x = THREE.MathUtils.lerp(this.rightLeg.rotation.x, 0, deltaTime * 10);
-      this.leftArm.rotation.x = THREE.MathUtils.lerp(this.leftArm.rotation.x, -0.1, deltaTime * 10);
-      this.rightArm.rotation.x = THREE.MathUtils.lerp(this.rightArm.rotation.x, -0.1, deltaTime * 10);
-      this.rifle.position.y = THREE.MathUtils.lerp(this.rifle.position.y, 1.35, deltaTime * 10);
+      
+      // Calculate movement relative to camera orientation
+      const yawAngle = this.cameraYaw;
+      moveVector.x = Math.sin(yawAngle) * this.direction.z + Math.cos(yawAngle) * this.direction.x;
+      moveVector.z = Math.cos(yawAngle) * this.direction.z - Math.sin(yawAngle) * this.direction.x;
+      moveVector.normalize();
+      
+      this.group.position.x += moveVector.x * currentSpeed * deltaTime;
+      this.group.position.z += moveVector.z * currentSpeed * deltaTime;
     }
+
+    // Apply Gravity physics
+    if (!this.isGrounded) {
+      this.velocity.y -= this.gravity * deltaTime;
+    }
+
+    // Jump trigger
+    if (inputManager.keys.jump && this.isGrounded) {
+      this.velocity.y = this.jumpForce;
+      this.isGrounded = false;
+    }
+
+    // Update Y position
+    this.group.position.y += this.velocity.y * deltaTime;
+
+    // Ground collision check
+    if (this.group.position.y <= 0) {
+      this.group.position.y = 0;
+      this.velocity.y = 0;
+      this.isGrounded = true;
+    }
+
+    // Lock camera position exactly to player's head height
+    this.camera.position.set(
+      this.group.position.x,
+      this.group.position.y + 1.7, // Head height
+      this.group.position.z
+    );
+
+    // -----------------------------------------
+    // 3. AIM DOWN SIGHTS (ADS) & FOV INTERPOLATION
+    // -----------------------------------------
+    const targetFov = inputManager.keys.ads 
+      ? 52  // Zoomed in ADS FOV
+      : (isSprinting ? 84 : 75); // Extra wide FOV when sprinting
+
+    this.currentFov = THREE.MathUtils.lerp(this.currentFov, targetFov, deltaTime * 12);
+    this.camera.fov = this.currentFov;
+    this.camera.updateProjectionMatrix();
+
+    // Lerp weapon position & rotation (ADS vs Hipfire)
+    const targetGunPos = inputManager.keys.ads ? this.adsPosition : this.hipfirePosition;
+    const targetGunRot = inputManager.keys.ads ? this.adsRotation : this.hipfireRotation;
+    
+    // Weapon bobbing effect when walking (only active if moving and grounded)
+    const isMoving = this.direction.length() > 0 && this.isGrounded;
+    let bobX = 0;
+    let bobY = 0;
+    
+    if (isMoving && !inputManager.keys.ads) {
+      const bobSpeed = isSprinting ? 14 : 9;
+      this.bobTime += deltaTime * bobSpeed;
+      
+      // Traditional figure-8 weapon bobbing pattern
+      bobX = Math.sin(this.bobTime) * 0.012;
+      bobY = Math.cos(this.bobTime * 2) * 0.008;
+    }
+
+    this.gunGroup.position.x = THREE.MathUtils.lerp(this.gunGroup.position.x, targetGunPos.x + bobX, deltaTime * 14);
+    this.gunGroup.position.y = THREE.MathUtils.lerp(this.gunGroup.position.y, targetGunPos.y + bobY, deltaTime * 14);
+    this.gunGroup.position.z = THREE.MathUtils.lerp(this.gunGroup.position.z, targetGunPos.z, deltaTime * 14);
+
+    this.gunGroup.rotation.x = THREE.MathUtils.lerp(this.gunGroup.rotation.x, targetGunRot.x, deltaTime * 14);
+    this.gunGroup.rotation.y = THREE.MathUtils.lerp(this.gunGroup.rotation.y, targetGunRot.y, deltaTime * 14);
+    this.gunGroup.rotation.z = THREE.MathUtils.lerp(this.gunGroup.rotation.z, targetGunRot.z, deltaTime * 14);
 
     // Keep player within ground bounds
     this.group.position.x = clamp(this.group.position.x, -48, 48);
@@ -245,7 +236,7 @@ export class Player {
     if (this.muzzlePoint) {
       this.muzzlePoint.getWorldPosition(pos);
     } else {
-      pos.copy(this.group.position).y += 1.35; // fallback
+      pos.copy(this.camera.position).add(new THREE.Vector3(0.15, -0.15, -0.3)); // backup
     }
     return pos;
   }

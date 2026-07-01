@@ -1,16 +1,37 @@
-// Tracks keyboard and mouse input state
+// Tracks keyboard, mouse movement, and click states (modified for FPS controls)
 
 export class InputManager {
   constructor() {
-    this.keys = { forward: false, backward: false, left: false, right: false, reload: false, sprint: false, shoot: false };
+    this.keys = { 
+      forward: false, 
+      backward: false, 
+      left: false, 
+      right: false, 
+      reload: false, 
+      sprint: false, 
+      shoot: false,
+      ads: false,   // Aim Down Sights (Right-click)
+      jump: false   // Jump physics (Spacebar)
+    };
     this.mouse = { movementX: 0, movementY: 0 };
     this.isPointerLocked = false;
 
+    // Listeners for key presses
     window.addEventListener('keydown', (e) => this._updateKey(e.code, true));
     window.addEventListener('keyup', (e) => this._updateKey(e.code, false));
+    
+    // Mouse movement
     window.addEventListener('mousemove', (e) => this._onMouseMove(e));
+    
+    // Left-click (shoot) & Right-click (aim down sights)
     window.addEventListener('mousedown', (e) => this._onMouseButton(e, true));
     window.addEventListener('mouseup', (e) => this._onMouseButton(e, false));
+    
+    // Disable right-click context menu so it doesn't break aiming
+    window.addEventListener('contextmenu', (e) => {
+      if (this.isPointerLocked) e.preventDefault();
+    });
+
     document.addEventListener('pointerlockchange', () => {
       this.isPointerLocked = document.pointerLockElement !== null;
     });
@@ -34,6 +55,7 @@ export class InputManager {
       case 'KeyA': case 'ArrowLeft':   this.keys.left     = pressed; break;
       case 'KeyD': case 'ArrowRight':  this.keys.right    = pressed; break;
       case 'KeyR':                    this.keys.reload   = pressed; break;
+      case 'Space':                   this.keys.jump     = pressed; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.sprint = pressed; break;
     }
   }
@@ -46,8 +68,12 @@ export class InputManager {
   }
 
   _onMouseButton(e, pressed) {
-    if (e.button === 0 && this.isPointerLocked) { // Left click
-      this.keys.shoot = pressed;
+    if (!this.isPointerLocked) return;
+
+    if (e.button === 0) {
+      this.keys.shoot = pressed; // Left click
+    } else if (e.button === 2) {
+      this.keys.ads = pressed;   // Right click
     }
   }
 }
