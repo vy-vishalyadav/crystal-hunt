@@ -1,4 +1,4 @@
-// Main entry point — wires everything together and runs the game loop with shooting mechanics
+// Main entry point — wires everything together and runs the game loop with shooting mechanics, ammo/reloads, waves, and SFX
 
 import './style.css';
 import * as THREE from 'three';
@@ -11,6 +11,7 @@ import { CollectibleManager } from './entities/Collectible.js';
 import { EnemyManager } from './entities/Enemy.js';
 import { ParticleSystem } from './systems/ParticleSystem.js';
 import { GameState } from './systems/GameState.js';
+import { AudioManager } from './systems/AudioManager.js';
 import { HUD } from './ui/HUD.js';
 import { MenuScreen, GameOverScreen, WinScreen } from './ui/MenuScreen.js';
 
@@ -20,6 +21,7 @@ const { scene, camera, renderer } = createScene(canvas);
 const inputManager = new InputManager();
 const particleSystem = new ParticleSystem(scene);
 const gameState = new GameState();
+const audioManager = new AudioManager();
 
 // ===== Game objects (initialized on game start) =====
 let player, thirdPersonCamera, environment, collectibles, enemies;
@@ -29,6 +31,17 @@ let tracers = [];
 let muzzleFlashes = [];
 let shootCooldown = 0;
 let shakeIntensity = 0;
+
+// ===== Weapon Ammo State =====
+let ammoLoaded = 30;
+let ammoReserve = 120;
+let isReloading = false;
+let reloadTimer = 0;
+
+// ===== Wave System State =====
+let currentWave = 1;
+let lastCrystalCount = 0;
+let zombieBaseSpeed = 1.8;
 
 // ===== HUD =====
 const hud = new HUD();
@@ -49,7 +62,26 @@ function initGame() {
   hud.updateScore(0);
   gameState.score = 0;
 
-  // Reset effects state
+  // Reset ammo
+  ammoLoaded = 30;
+  ammoReserve = 120;
+  isReloading = false;
+  reloadTimer = 0;
+  hud.updateAmmo(ammoLoaded, ammoReserve);
+  hud.setReloading(false);
+
+  // Reset waves
+  currentWave = 1;
+  lastCrystalCount = 0;
+  zombieBaseSpeed = 1.8;
+  hud.showWaveBanner("WAVE 1");
+
+  // Play a welcoming zombie growl
+  setTimeout(() => {
+    audioManager.playZombieGrowl();
+  }, 1000);
+
+  // Reset visual effects arrays
   tracers.forEach(t => scene.remove(t.line));
   muzzleFlashes.forEach(f => scene.remove(f.mesh));
   tracers = [];
@@ -62,6 +94,9 @@ function initGame() {
 const menuScreen = new MenuScreen(() => {
   menuScreen.hide();
   gameState.setState('playing');
+  
+  // Initialize and resume browser AudioContext on click
+  audioManager._init(); 
   initGame();
 });
 
@@ -92,68 +127,117 @@ function animate() {
     particleSystem.update(deltaTime);
 
     // -----------------------------------------
+    // RELOADING LOGIC
+    // -----------------------------------------
+    if (isReloading) {
+      reloadTimer -= deltaTime;
+      if (reloadTimer <= 0) {
+        // Complete reload
+        const needed = 30 - ammoLoaded;
+        const transfer = Math.min(needed, ammoReserve);
+        ammoLoaded += transfer;
+        ammoReserve -= transfer;
+        isReloading = false;
+        hud.setReloading(false);
+        hud.updateAmmo(ammoLoaded, ammoReserve);
+      }
+    }
+
+    // Manual reload trigger
+    if (inputManager.keys.reload && !isReloading && ammoLoaded < 30 && ammoReserve > 0 && player.isAlive) {
+      isReloading = true;
+      reloadTimer = 1.5; // 1.5 seconds reload speed
+      hud.setReloading(true);
+      audioManager.playReload();
+    }
+
+    // -----------------------------------------
     // SHOOTING SYSTEM (M416 Automatic Fire)
     // -----------------------------------------
     if (shootCooldown > 0) {
       shootCooldown -= deltaTime;
     }
 
+    // Attempt to shoot
     if (inputManager.keys.shoot && shootCooldown <= 0 && player.isAlive) {
-      shootCooldown = 0.12; // 120ms between shots (~500 RPM)
-      shakeIntensity = 0.08; // Apply camera recoil shake
-
-      const muzzlePos = player.getMuzzlePosition();
-      
-      // Calculate shooting vector from screen center (crosshair)
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-      // Default bullet endpoint (100 units along camera gaze)
-      const cameraDir = new THREE.Vector3();
-      camera.getWorldDirection(cameraDir);
-      let endPoint = new THREE.Vector3().copy(camera.position).addScaledVector(cameraDir, 100);
-
-      // Check if we hit an enemy commando
-      const hitResult = enemies.checkRaycastHit(raycaster, 10); // deals 10 damage per shot
-
-      if (hitResult && hitResult.hit) {
-        endPoint.copy(hitResult.hitPoint);
-        
-        if (hitResult.killed) {
-          gameState.addScore(150); // 150 points reward for kill
-          hud.updateScore(gameState.score);
-          // Crimson burst particle effect on kill
-          particleSystem.emit(hitResult.hitPoint, 0x8a0303, 20);
+      if (isReloading) {
+        // Can't shoot while reloading
+        shootCooldown = 0.1;
+      } else if (ammoLoaded <= 0) {
+        // Out of ammo! Trigger auto-reload
+        if (ammoReserve > 0) {
+          isReloading = true;
+          reloadTimer = 1.5;
+          hud.setReloading(true);
+          audioManager.playReload();
         } else {
-          // Yellow spark particles on impact
-          particleSystem.emit(hitResult.hitPoint, 0xffa500, 6);
+          // completely dry
+          shootCooldown = 0.2;
         }
       } else {
-        // Raycast environment & ground to make bullet tracers stop on objects (optimized to query only static collidable meshes)
-        const intersects = raycaster.intersectObjects(environment.collidableMeshes, true);
-        if (intersects.length > 0) {
-          const hit = intersects[0];
-          endPoint.copy(hit.point);
-          // Gray dust impact sparks
-          particleSystem.emit(hit.point, 0xbfbfbf, 4);
+        // Fire bullet
+        ammoLoaded--;
+        hud.updateAmmo(ammoLoaded, ammoReserve);
+
+        shootCooldown = 0.12; // 120ms between shots (~500 RPM)
+        shakeIntensity = 0.08; // Apply camera recoil shake
+
+        // Play gunshot SFX
+        audioManager.playShoot();
+
+        const muzzlePos = player.getMuzzlePosition();
+        
+        // Calculate shooting vector from screen center (crosshair)
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+        // Default bullet endpoint (100 units along camera gaze)
+        const cameraDir = new THREE.Vector3();
+        camera.getWorldDirection(cameraDir);
+        let endPoint = new THREE.Vector3().copy(camera.position).addScaledVector(cameraDir, 100);
+
+        // Check if we hit an enemy zombie
+        const hitResult = enemies.checkRaycastHit(raycaster, 10); // deals 10 damage per shot
+
+        if (hitResult && hitResult.hit) {
+          endPoint.copy(hitResult.hitPoint);
+          
+          if (hitResult.killed) {
+            gameState.addScore(150); // 150 points reward for kill
+            hud.updateScore(gameState.score);
+            // Crimson burst particle effect on kill
+            particleSystem.emit(hitResult.hitPoint, 0x8a0303, 20);
+          } else {
+            // Yellow spark particles on impact
+            particleSystem.emit(hitResult.hitPoint, 0xffa500, 6);
+          }
+        } else {
+          // Raycast environment & ground to make bullet tracers stop on objects (optimized to query only static collidable meshes)
+          const intersects = raycaster.intersectObjects(environment.collidableMeshes, true);
+          if (intersects.length > 0) {
+            const hit = intersects[0];
+            endPoint.copy(hit.point);
+            // Gray dust impact sparks
+            particleSystem.emit(hit.point, 0xbfbfbf, 4);
+          }
         }
+
+        // 1. Create Muzzle Flash (quick bright yellow sphere)
+        const flashGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        const flashMat = new THREE.MeshBasicMaterial({ color: 0xffe600 });
+        const flashMesh = new THREE.Mesh(flashGeo, flashMat);
+        flashMesh.position.copy(muzzlePos);
+        scene.add(flashMesh);
+        muzzleFlashes.push({ mesh: flashMesh, lifetime: 0.05, age: 0 });
+
+        // 2. Create Bullet Tracer Line (fading yellow ray)
+        const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe57f, transparent: true, opacity: 0.9 });
+        const tracerPoints = [muzzlePos, endPoint];
+        const tracerGeo = new THREE.BufferGeometry().setFromPoints(tracerPoints);
+        const tracerLine = new THREE.Line(tracerGeo, tracerMat);
+        scene.add(tracerLine);
+        tracers.push({ line: tracerLine, lifetime: 0.08, age: 0 });
       }
-
-      // 1. Create Muzzle Flash (quick bright yellow sphere)
-      const flashGeo = new THREE.SphereGeometry(0.12, 8, 8);
-      const flashMat = new THREE.MeshBasicMaterial({ color: 0xffe600 });
-      const flashMesh = new THREE.Mesh(flashGeo, flashMat);
-      flashMesh.position.copy(muzzlePos);
-      scene.add(flashMesh);
-      muzzleFlashes.push({ mesh: flashMesh, lifetime: 0.05, age: 0 });
-
-      // 2. Create Bullet Tracer Line (fading yellow ray)
-      const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe57f, transparent: true, opacity: 0.9 });
-      const tracerPoints = [muzzlePos, endPoint];
-      const tracerGeo = new THREE.BufferGeometry().setFromPoints(tracerPoints);
-      const tracerLine = new THREE.Line(tracerGeo, tracerMat);
-      scene.add(tracerLine);
-      tracers.push({ line: tracerLine, lifetime: 0.08, age: 0 });
     }
 
     // -----------------------------------------
@@ -191,15 +275,40 @@ function animate() {
       camera.position.add(shakeOffset);
     }
 
-    // Crystal collection check
+    // -----------------------------------------
+    // CRYSTAL COLLECTION & WAVE PROGRESSION
+    // -----------------------------------------
     const collected = collectibles.checkCollection(player.position);
     if (collected > 0) {
+      // Play collection ring SFX
+      audioManager.playCollect();
+
       gameState.addScore(collected * 100);
       hud.updateScore(gameState.score);
       particleSystem.emit(
         new THREE.Vector3(player.position.x, player.position.y + 1.5, player.position.z),
         0xFFD700, 20
       );
+
+      // Wave progression (Triggered every 3 crystals collected)
+      const currentCollected = collectibles.collectedCount;
+      if (currentCollected > 0 && currentCollected % 3 === 0 && currentCollected > lastCrystalCount) {
+        currentWave++;
+        hud.showWaveBanner("WAVE " + currentWave);
+        
+        // Play zombie roar and speed them up
+        audioManager.playZombieGrowl();
+        zombieBaseSpeed += 0.35; // Speed up zombies
+        
+        enemies.enemies.forEach(e => {
+          e.speed = zombieBaseSpeed;
+        });
+
+        // Spawn 2 extra zombies for increased difficulty
+        enemies.spawnEnemy(currentWave, 8);
+        enemies.spawnEnemy(currentWave + 1, 8);
+      }
+      lastCrystalCount = currentCollected;
 
       // Win check
       if (collectibles.collectedCount >= collectibles.totalCount) {
@@ -209,9 +318,14 @@ function animate() {
       }
     }
 
-    // Enemy damage check
+    // -----------------------------------------
+    // DAMAGE FROM ZOMBIES
+    // -----------------------------------------
     const damage = enemies.checkAttacks(player.position);
     if (damage > 0) {
+      // Play damage groan SFX
+      audioManager.playDamage();
+
       player.takeDamage(damage);
       hud.updateHealth(player.health);
       hud.flashDamage();
@@ -219,6 +333,11 @@ function animate() {
         new THREE.Vector3(player.position.x, player.position.y + 1, player.position.z),
         0xE74C3C, 10
       );
+
+      // Play random zombie growl sound occasionally when attacking
+      if (Math.random() < 0.3) {
+        audioManager.playZombieGrowl();
+      }
 
       // Death check
       if (!player.isAlive) {
@@ -236,4 +355,4 @@ function animate() {
 }
 
 animate();
-console.log('🎮 Crystal Hunt loaded with Shooting Mechanics!');
+console.log('🎮 Crystal Hunt Phase 2 Loaded Successfully!');

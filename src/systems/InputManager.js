@@ -2,7 +2,7 @@
 
 export class InputManager {
   constructor() {
-    this.keys = { forward: false, backward: false, left: false, right: false, sprint: false, shoot: false };
+    this.keys = { forward: false, backward: false, left: false, right: false, reload: false, sprint: false, shoot: false };
     this.mouse = { movementX: 0, movementY: 0 };
     this.isPointerLocked = false;
 
@@ -33,6 +33,7 @@ export class InputManager {
       case 'KeyS': case 'ArrowDown':   this.keys.backward = pressed; break;
       case 'KeyA': case 'ArrowLeft':   this.keys.left     = pressed; break;
       case 'KeyD': case 'ArrowRight':  this.keys.right    = pressed; break;
+      case 'KeyR':                    this.keys.reload   = pressed; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.sprint = pressed; break;
     }
   }
