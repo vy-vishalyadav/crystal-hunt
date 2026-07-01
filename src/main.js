@@ -1,4 +1,4 @@
-// Main entry point — wires everything together and runs the FPS game loop with shooting mechanics, ammo/reloads, waves, and SFX
+// Main entry point — wires everything together and runs the FPS game loop with shooting mechanics, ammo/reloads, and SFX (waves removed)
 
 import './style.css';
 import * as THREE from 'three';
@@ -37,11 +37,6 @@ let ammoReserve = 120;
 let isReloading = false;
 let reloadTimer = 0;
 
-// ===== Wave System State =====
-let currentWave = 1;
-let lastCrystalCount = 0;
-let zombieBaseSpeed = 1.8;
-
 // ===== HUD =====
 const hud = new HUD();
 hud.hide();
@@ -51,7 +46,7 @@ function initGame() {
   player = new Player(scene, camera);
   environment = new Environment(scene);
   collectibles = new CollectibleManager(scene, 15);
-  enemies = new EnemyManager(scene, 8);
+  enemies = new EnemyManager(scene, 8); // Keeps static 8 zombies
 
   inputManager.requestPointerLock(canvas);
 
@@ -67,12 +62,6 @@ function initGame() {
   reloadTimer = 0;
   hud.updateAmmo(ammoLoaded, ammoReserve);
   hud.setReloading(false);
-
-  // Reset waves
-  currentWave = 1;
-  lastCrystalCount = 0;
-  zombieBaseSpeed = 1.8;
-  hud.showWaveBanner("WAVE 1");
 
   // Play a welcoming zombie growl
   setTimeout(() => {
@@ -268,7 +257,7 @@ function animate() {
     }
 
     // -----------------------------------------
-    // CRYSTAL COLLECTION & WAVE PROGRESSION
+    // CRYSTAL COLLECTION
     // -----------------------------------------
     const collected = collectibles.checkCollection(player.position);
     if (collected > 0) {
@@ -280,25 +269,6 @@ function animate() {
         new THREE.Vector3(player.position.x, player.position.y + 1.0, player.position.z),
         0xFFD700, 20
       );
-
-      // Wave progression (Triggered every 3 crystals collected)
-      const currentCollected = collectibles.collectedCount;
-      if (currentCollected > 0 && currentCollected % 3 === 0 && currentCollected > lastCrystalCount) {
-        currentWave++;
-        hud.showWaveBanner("WAVE " + currentWave);
-        
-        audioManager.playZombieGrowl();
-        zombieBaseSpeed += 0.35; // Speed up zombies
-        
-        enemies.enemies.forEach(e => {
-          e.speed = zombieBaseSpeed;
-        });
-
-        // Spawn 2 extra zombies
-        enemies.spawnEnemy(currentWave, 8);
-        enemies.spawnEnemy(currentWave + 1, 8);
-      }
-      lastCrystalCount = currentCollected;
 
       // Win check
       if (collectibles.collectedCount >= collectibles.totalCount) {
@@ -345,4 +315,4 @@ function animate() {
 }
 
 animate();
-console.log('🎮 Crystal Hunt FPS Mode Loaded!');
+console.log('🎮 Crystal Hunt Loaded!');

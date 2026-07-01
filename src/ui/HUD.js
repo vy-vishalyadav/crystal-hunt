@@ -36,7 +36,6 @@ export class HUD {
       <div class="crosshair" id="crosshair">+</div>
       <div class="damage-overlay" id="damage-overlay"></div>
       <div class="reload-overlay" id="reload-overlay">RELOADING...</div>
-      <div class="wave-banner" id="wave-banner">WAVE 1</div>
     `;
     document.body.appendChild(this.container);
 
@@ -46,7 +45,6 @@ export class HUD {
     this.ammoLoadedText = document.getElementById('ammo-loaded');
     this.ammoReserveText = document.getElementById('ammo-reserve');
     this.reloadOverlay = document.getElementById('reload-overlay');
-    this.waveBanner = document.getElementById('wave-banner');
     this.damageOverlay = document.getElementById('damage-overlay');
     this.controlsHint = document.getElementById('controls-hint');
   }
@@ -86,16 +84,6 @@ export class HUD {
 
   hideControlsHint() {
     this.controlsHint.style.opacity = '0';
-  }
-
-  showWaveBanner(text) {
-    this.waveBanner.textContent = text;
-    this.waveBanner.style.opacity = '1';
-    this.waveBanner.style.transform = 'translate(-50%, -50%) scale(1.1)';
-    setTimeout(() => {
-      this.waveBanner.style.opacity = '0';
-      this.waveBanner.style.transform = 'translate(-50%, -50%) scale(0.9)';
-    }, 2000);
   }
 
   show() { this.container.style.display = 'block'; }
